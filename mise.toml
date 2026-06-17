@@ -1,0 +1,50 @@
+[tools]
+go = "1.26"
+"go:github.com/daixiang0/gci" = "latest"
+"go:k8s.io/code-generator/cmd/client-gen" = { version = "v0.35.0" }
+"go:sigs.k8s.io/controller-tools/cmd/controller-gen" = { version = "v0.20.0" }
+"ubi:golangci/golangci-lint" = "2.10"
+"ubi:goreleaser/goreleaser" = "2.14"
+
+[env]
+CGO_ENABLED=0
+LGFLAGS="-extldflags '-static'"
+IMAGE="skpr/pinchy-grpc-go:latest"
+PB_DIR="proto/pb"
+
+[tasks.vendor]
+description = "Vendor resets the main module's vendor directory to include all packages needed to build the application"
+run = "go mod vendor"
+
+[tasks.tidy]
+description = "Tidy makes sure go.mod matches the source code in the module"
+run = "go mod tidy"
+
+[tasks.generate]
+description = "Build the grpc protocol"
+file = "scripts/generate.sh"
+depends = ["vendor"]
+
+[tasks."build"]
+description = "Build the application"
+run = '''
+go build -o bin/pinchy -ldflags=${CLI_LDFLAGS} github.com/skpr/pinchy/cmd/pinchy
+go build -o bin/pinchy-api -ldflags=${CLI_LDFLAGS} github.com/skpr/pinchy/cmd/pinchy-api
+go build -o bin/pinchy-operator -ldflags=${CLI_LDFLAGS} github.com/skpr/pinchy/cmd/pinchy-operator
+go build -o bin/pinchy-proxy -ldflags=${CLI_LDFLAGS} github.com/skpr/pinchy/cmd/pinchy-proxy
+'''
+depends = ["vendor"]
+
+[tasks."lint"]
+description = "Linting automatically checks code for errors and style issues"
+run = "golangci-lint run"
+
+[tasks.test]
+description = "Checks to verify code correctness"
+run = "go test -cover ./..."
+depends = ["vendor"]
+
+[tasks.release]
+description = "Release the command line interface"
+run = "goreleaser"
+depends = ["build"]

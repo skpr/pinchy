@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pinchy Board</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Pinchy <span>Board</span></h1>
+      <nav class="tabs">
+        <button class="tab active" data-tab="board">Board</button>
+        <button class="tab" data-tab="environments">Environments</button>
+      </nav>
+      <div class="topbar-right">
+        <span id="status" class="status-dot" title="Connection status"></span>
+        <span id="status-text">connecting…</span>
+      </div>
+    </header>
+    <main id="page-board" class="board">
+      <p class="empty">Loading sessions…</p>
+    </main>
+    <main id="page-environments" class="environments hidden">
+      <p class="empty">Loading environments…</p>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

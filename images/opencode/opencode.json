@@ -1,0 +1,31 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "litellm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LiteLLM",
+      "options": {
+        "baseURL": "http://localhost:4000/v1",
+        "apiKey": "sk-master-pinchy"
+      },
+      "models": {
+        "claude-sonnet": {
+          "name": "Claude Sonnet (Anthropic)",
+          "cost": { "input": 3, "output": 15, "cache_write": 3.75, "cache_read": 0.30 }
+        },
+        "claude-opus": {
+          "name": "Claude Opus (Anthropic)",
+          "cost": { "input": 15, "output": 75, "cache_write": 18.75, "cache_read": 1.50 }
+        },
+        "claude-sonnet-bedrock": {
+          "name": "Claude Sonnet (Bedrock)",
+          "cost": { "input": 3, "output": 15, "cache_write": 3.75, "cache_read": 0.30 }
+        },
+        "claude-opus-bedrock": {
+          "name": "Claude Opus (Bedrock)",
+          "cost": { "input": 15, "output": 75, "cache_write": 18.75, "cache_read": 1.50 }
+        }
+      }
+    }
+  }
+}

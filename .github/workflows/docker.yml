@@ -1,0 +1,73 @@
+name: Docker
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build & publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Required for linux/arm64 emulation.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Skip login on pull requests — images are built but not pushed.
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Compute the bare tag suffix list that docker-bake.hcl expects.
+      #
+      # push to main  → ["latest","sha-<short>"]
+      # push tag v*   → ["vX.Y.Z","X.Y.Z"]          (latest NOT added here)
+      # pull_request  → ["latest"]                   (built but not pushed)
+      - name: Compute tags
+        id: tags
+        shell: bash
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          event="${{ github.event_name }}"
+          ref="${{ github.ref }}"
+
+          if [[ "$event" == "push" && "$ref" == refs/heads/* ]]; then
+            tags='["latest","sha-'"$short_sha"'"]'
+          elif [[ "$event" == "push" && "$ref" == refs/tags/v* ]]; then
+            version="${ref#refs/tags/v}"
+            tags='["v'"$version"'","'"$version"'"]'
+          else
+            tags='["latest"]'
+          fi
+
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+      - name: Build (and push) images
+        uses: docker/bake-action@v5
+        with:
+          files: docker-bake.hcl
+          targets: default
+          push: ${{ github.event_name != 'pull_request' }}
+          set: |
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
+        env:
+          TAGS: ${{ steps.tags.outputs.tags }}

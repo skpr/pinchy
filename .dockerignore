@@ -1,0 +1,5 @@
+.git
+.kube
+workspace
+bin
+*.md

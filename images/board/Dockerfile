@@ -1,0 +1,27 @@
+FROM golang:1.26-alpine AS build
+
+WORKDIR /app
+
+# Module + vendored deps first for layer caching.
+COPY go.mod go.sum ./
+COPY vendor/ vendor/
+
+# Source.
+COPY . .
+
+# Static binary (matches mise.toml: CGO_ENABLED=0, static link, vendored).
+RUN CGO_ENABLED=0 go build -mod=vendor \
+    -ldflags="-extldflags '-static'" \
+    -o /pinchy-board \
+    github.com/skpr/pinchy/cmd/pinchy-board
+
+FROM alpine:3.23
+
+RUN apk add --no-cache ca-certificates
+
+COPY --from=build /pinchy-board /usr/local/bin/pinchy-board
+
+EXPOSE 8090
+
+ENTRYPOINT ["pinchy-board"]
+CMD ["listen"]

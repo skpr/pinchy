@@ -1,0 +1,139 @@
+services:
+  opencode:
+    build:
+      dockerfile: images/opencode/Dockerfile
+      context: .
+    container_name: pinchy-opencode
+    network_mode: service:k3s
+    restart: unless-stopped
+    working_dir: /workspace
+    volumes:
+      - ./workspace:/workspace
+      # Persist opencode session data (DB, auth, logs) across compose down/up.
+      - opencode-data:/home/pinchy/.local/share/opencode
+
+  litellm:
+    build:
+      context: images/litellm
+    container_name: pinchy-litellm
+    # Share the k3s network namespace so opencode can reach LiteLLM on localhost:4000.
+    network_mode: service:k3s
+    env_file: .env # For secrets like Anthropic API keys; not checked into git.
+    restart: unless-stopped
+    depends_on:
+      k3s:
+        condition: service_healthy
+
+  api:
+    build:
+      dockerfile: images/api/Dockerfile
+      context: .
+    container_name: pinchy-api
+    network_mode: service:k3s
+    restart: unless-stopped
+    depends_on:
+      k3s:
+        condition: service_healthy
+    environment:
+      KUBECONFIG: /root/.kube/config
+    volumes:
+      - ./.kube:/root/.kube
+
+  operator:
+    build:
+      dockerfile: images/operator/Dockerfile
+      context: .
+    container_name: pinchy-operator
+    network_mode: service:k3s
+    restart: unless-stopped
+    depends_on:
+      k3s:
+        condition: service_healthy
+    environment:
+      KUBECONFIG: /root/.kube/config
+    volumes:
+      - ./.kube:/root/.kube
+
+  proxy:
+    build:
+      dockerfile: images/proxy/Dockerfile
+      context: .
+    container_name: pinchy-proxy
+    network_mode: service:k3s
+    restart: unless-stopped
+    depends_on:
+      k3s:
+        condition: service_healthy
+    environment:
+      KUBECONFIG: /root/.kube/config
+    volumes:
+      - ./.kube:/root/.kube
+
+  board:
+    build:
+      dockerfile: images/board/Dockerfile
+      context: .
+    container_name: pinchy-board
+    network_mode: service:k3s
+    restart: unless-stopped
+    depends_on:
+      - opencode
+      - api
+    environment:
+      # opencode runs in the shared k3s network namespace on port 4096.
+      OPENCODE_URL: http://localhost:4096
+      # The browser reaches opencode web via the host-published port.
+      OPENCODE_WEB_URL: http://localhost:4096
+      # pinchy-api gRPC server runs on port 50051 in the same network namespace.
+      PINCHY_API: localhost:50051
+
+  k3s:
+    image: rancher/k3s:v1.33.5-k3s1
+    command: server --node-name k3s --disable=local-storage --disable=servicelb --disable=metrics-server --disable=traefik
+    container_name: pinchy-k3s
+    privileged: true
+    restart: unless-stopped
+    cgroup: host
+    tmpfs:
+      - /run
+      - /var/run
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD", "kubectl", "get", "--raw=/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    environment:
+      K3S_TOKEN: pinchy
+      K3S_KUBECONFIG_OUTPUT: /output/config
+      K3S_KUBECONFIG_MODE: "644"
+    ports:
+      # OpenCode API
+      - "4096:4096"
+      # Kubernetes API
+      - "6443:6443"
+      # Pinchy API server
+      - "50051:50051"
+      # Pinchy proxy host ports.
+      - "8080:8080"
+      - "3000:3000"
+      # Pinchy board.
+      - "8090:8090"
+      # LiteLLM proxy
+      - "4000:4000"
+    volumes:
+      - ./workspace:/workspace
+      # Kubeconfig output for local kubectl/mise access.
+      - ./.kube:/output
+      # Auto-deploy the Environment CRD and pinchy-environment namespace on startup.
+      - ./config/crd/bases:/var/lib/rancher/k3s/server/manifests/pinchy-crd:ro
+      - ./images/k3s/manifests:/var/lib/rancher/k3s/server/manifests/pinchy:ro
+
+volumes:
+  # Stores opencode sessions so they survive `docker compose down`.
+  opencode-data:

@@ -1,0 +1,65 @@
+/** Service responsible for coordinating environments */
+syntax = "proto3";
+
+package pinchy;
+
+option go_package = "./pb";
+
+service environment {
+  rpc Create(CreateRequest) returns (CreateResponse);
+  rpc Exec(ExecRequest) returns (ExecResponse);
+  rpc List(ListRequest) returns (ListResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+}
+
+message Environment {
+  string sessionID = 1;
+  string path      = 2; // host workspace path to mount into the environment
+}
+
+message CreateRequest {
+  Environment environment = 1;
+}
+
+message CreateResponse {
+  enum Phase {
+    UNKNOWN = 0;
+    RUNNING = 1;
+    FAILED  = 2;
+  }
+  Phase phase = 1;
+}
+
+message ExecRequest {
+  string sessionID = 1;
+  string command   = 2; // a shell command line, executed via /bin/sh -c
+  string workdir   = 3; // working directory to run the command in (optional)
+}
+
+message ExecResponse {
+  bytes  stdout   = 1;
+  bytes  stderr   = 2;
+  int32  exitCode = 3;
+}
+
+// EnvironmentInfo is a summary of a single Environment resource.
+message EnvironmentInfo {
+  string name      = 1; // the Environment resource name (RFC1123 subdomain)
+  string sessionID = 2; // from the pinchy.dev/session-id annotation
+  string path      = 3; // Spec.Path — the host workspace directory
+  string phase     = 4; // Status.Phase: Pending | Running | Failed
+  string podIP     = 5; // Status.PodIP, empty while the Pod is not yet Running
+  int64  createdAt = 6; // CreationTimestamp in Unix seconds
+}
+
+message ListRequest {}
+
+message ListResponse {
+  repeated EnvironmentInfo environments = 1;
+}
+
+message DeleteRequest {
+  string name = 1; // the Environment resource name to delete
+}
+
+message DeleteResponse {}

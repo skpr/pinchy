@@ -1,0 +1,23 @@
+model_list:
+  # Claude via Anthropic API
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-opus
+    litellm_params:
+      model: anthropic/claude-opus-4-8
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # Claude via AWS Bedrock
+  - model_name: claude-sonnet-bedrock
+    litellm_params:
+      model: bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0  # Change me
+      aws_region_name: ap-southeast-2
+  - model_name: claude-opus-bedrock
+    litellm_params:
+      model: bedrock/us.anthropic.claude-opus-4-5-20250929-v1:0  # Change me
+      aws_region_name: ap-southeast-2
+
+general_settings:
+  master_key: sk-master-pinchy 
