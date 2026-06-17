@@ -19,5 +19,29 @@ model_list:
       model: bedrock/us.anthropic.claude-opus-4-5-20250929-v1:0  # Change me
       aws_region_name: ap-southeast-2
 
+  # Kimi K2 Thinking via AWS Bedrock
+  - model_name: kimi-k2-thinking-bedrock
+    litellm_params:
+      model: bedrock/moonshot.kimi-k2-thinking
+      aws_region_name: ap-southeast-2
+
+  # Kimi K2.5 via AWS Bedrock
+  - model_name: kimi-k2-5-bedrock
+    litellm_params:
+      model: bedrock/moonshotai.kimi-k2.5
+      aws_region_name: ap-southeast-2
+
+  # Qwen3 Coder Next via AWS Bedrock
+  - model_name: qwen3-coder-next-bedrock
+    litellm_params:
+      model: bedrock/qwen.qwen3-coder-next
+      aws_region_name: ap-southeast-2
+
+  # MiniMax M2.5 via AWS Bedrock
+  - model_name: minimax-m2-5-bedrock
+    litellm_params:
+      model: bedrock/minimax.minimax-m2.5
+      aws_region_name: ap-southeast-2
+
 general_settings:
-  master_key: sk-master-pinchy 
+  master_key: sk-master-pinchy

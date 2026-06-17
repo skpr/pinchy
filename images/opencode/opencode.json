@@ -24,6 +24,22 @@
         "claude-opus-bedrock": {
           "name": "Claude Opus (Bedrock)",
           "cost": { "input": 15, "output": 75, "cache_write": 18.75, "cache_read": 1.50 }
+        },
+        "kimi-k2-thinking-bedrock": {
+          "name": "Kimi K2 Thinking (Bedrock)",
+          "cost": { "input": 0.618, "output": 2.575 }
+        },
+        "kimi-k2-5-bedrock": {
+          "name": "Kimi K2.5 (Bedrock)",
+          "cost": { "input": 0.618, "output": 3.09 }
+        },
+        "qwen3-coder-next-bedrock": {
+          "name": "Qwen3 Coder Next (Bedrock)",
+          "cost": { "input": 0.515, "output": 1.236 }
+        },
+        "minimax-m2-5-bedrock": {
+          "name": "MiniMax M2.5 (Bedrock)",
+          "cost": { "input": 0.36, "output": 1.44 }
         }
       }
     }
