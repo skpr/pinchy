@@ -2,52 +2,100 @@ package environment
 
 import (
 	"context"
-	"regexp"
-	"strings"
+	"encoding/json"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/skpr/pinchy/apis/pinchy/v1beta1"
+	"github.com/skpr/pinchy/internal/envname"
 	"github.com/skpr/pinchy/proto/pb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// Create a new environment.
+// sessionLabelKey returns the label key used to record that a session is using
+// this environment. Labels must be valid k8s label keys (63-char value limit,
+// alphanumeric/-/_/. chars). We store the sanitised session ID in the key so
+// all sessions for an environment are queryable without listing annotations.
+func sessionLabelKey(sessionID string) string {
+	return "pinchy.dev/session-" + RFC1123Subdomain(sessionID)
+}
+
+// Create a new environment, or reuse an existing one for the same workspace path.
+//
+// Environments are keyed by workspace path: all sessions operating in the same
+// directory share a single Environment (and its Pod). When path is empty we
+// fall back to keying by session ID, preserving backwards-compatible behaviour
+// for callers that do not supply a workdir.
+//
+// Each session that uses the environment is recorded as a label
+// "pinchy.dev/session-<sanitised-id>: true" so the board and cleanup logic
+// can enumerate them.
 func (s *Server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
 	sessionID := req.GetEnvironment().GetSessionID()
+	path := req.GetEnvironment().GetPath()
 
-	// Sanitize the session ID once; use it everywhere to ensure the field
-	// selector, Create, Get, and Watch all refer to the same object name.
-	name := RFC1123Subdomain(sessionID)
+	// Derive the environment name: path-based when a workspace is given,
+	// session-based otherwise (fallback for callers without --workdir).
+	name := envname.FromPath(path)
+	if name == "" {
+		name = RFC1123Subdomain(sessionID)
+	}
 
 	desired := &v1beta1.Environment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: s.namespace,
-			Annotations: map[string]string{
-				"pinchy.dev/session-id": sessionID,
+			Labels: map[string]string{
+				sessionLabelKey(sessionID): "true",
 			},
 		},
 		Spec: v1beta1.EnvironmentSpec{
-			// Path is the host workspace directory the session is working in.
-			// The operator mounts it into the environment Pod. Environments are
-			// create-only, so this is fixed for the lifetime of the session.
-			Path: req.GetEnvironment().GetPath(),
+			// Path is the host workspace directory mounted into the environment
+			// Pod by the operator. It is fixed for the lifetime of the
+			// environment — all sessions sharing a path share this value.
+			Path: path,
 		},
 	}
 
 	_, err := s.clientset.PinchyV1beta1().Environments(s.namespace).Create(ctx, desired, metav1.CreateOptions{})
-	if err != nil && !k8serrors.IsAlreadyExists(err) {
+	switch {
+	case err == nil:
+		// Freshly created — the session label is already on the object.
+
+	case k8serrors.IsAlreadyExists(err):
+		// The environment already exists (another session created it, or this
+		// session is re-connecting). Record this session as a user of the
+		// shared environment by merging the label in via a strategic-merge patch.
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]string{
+					sessionLabelKey(sessionID): "true",
+				},
+			},
+		}
+		patchBytes, err := json.Marshal(patch)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to marshal label patch: %v", err)
+		}
+		if _, err := s.clientset.PinchyV1beta1().Environments(s.namespace).Patch(
+			ctx, name, types.MergePatchType, patchBytes, metav1.PatchOptions{},
+		); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to patch environment labels: %v", err)
+		}
+
+	default:
 		return nil, status.Errorf(codes.Internal, "failed to create environment: %v", err)
 	}
 
 	// Check current phase before watching — the environment may already be
-	// Running (e.g. on a second exec call), in which case no new watch event
-	// will fire and the watch loop would block forever.
+	// Running (e.g. on a second exec call from a different session sharing
+	// this workspace), in which case no new watch event will fire and the
+	// watch loop would block forever.
 	current, err := s.clientset.PinchyV1beta1().Environments(s.namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get environment: %v", err)
@@ -91,30 +139,4 @@ func (s *Server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateR
 
 	// Watch channel closed without a terminal phase (e.g. context cancelled).
 	return &pb.CreateResponse{Phase: pb.CreateResponse_UNKNOWN}, nil
-}
-
-// matches any run of characters that are NOT lowercase alphanumeric, '-' or '.'
-var invalidChars = regexp.MustCompile(`[^a-z0-9.-]+`)
-
-// matches leading/trailing characters that aren't alphanumeric
-var trimEdges = regexp.MustCompile(`^[^a-z0-9]+|[^a-z0-9]+$`)
-
-// RFC1123Subdomain converts s into a string that satisfies the
-// RFC 1123 subdomain rules used by Kubernetes metadata.name:
-//   - lower case alphanumeric, '-' or '.'
-//   - must start and end with an alphanumeric character
-//   - at most 253 characters
-func RFC1123Subdomain(s string) string {
-	s = strings.ToLower(s)
-	// replace any invalid character (incl. '_') with '-'
-	s = invalidChars.ReplaceAllString(s, "-")
-	// strip any leading/trailing non-alphanumeric chars
-	s = trimEdges.ReplaceAllString(s, "")
-
-	if len(s) > 253 {
-		s = s[:253]
-		// trimming may have left a trailing separator; clean it up
-		s = trimEdges.ReplaceAllString(s, "")
-	}
-	return s
 }

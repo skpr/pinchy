@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/skpr/pinchy/internal/envname"
 	"github.com/skpr/pinchy/proto/pb"
 )
 
@@ -30,8 +31,16 @@ func (s *Server) Exec(ctx context.Context, req *pb.ExecRequest) (*pb.ExecRespons
 
 	// Run the command through a shell so that the full range of shell syntax
 	// (arguments, pipes, redirects, &&, env vars, etc.) works as expected.
-	// The Pod name equals the sanitized sessionID (see controllers/environment/controller.go).
+	//
+	// Resolve the Pod name using the same logic as Create: path-based when a
+	// workdir is supplied, session-based as a fallback. This guarantees that
+	// Exec targets the same shared environment Pod that Create provisioned.
 	command := req.GetCommand()
+
+	podName := envname.FromPath(req.GetWorkdir())
+	if podName == "" {
+		podName = RFC1123Subdomain(req.GetSessionID())
+	}
 
 	// If a working directory was requested, change into it first. The workspace
 	// is mounted at the same path inside the Pod, so this matches the directory
@@ -42,7 +51,7 @@ func (s *Server) Exec(ctx context.Context, req *pb.ExecRequest) (*pb.ExecRespons
 
 	execURL := s.kubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
-		Name(RFC1123Subdomain(req.GetSessionID())).
+		Name(podName).
 		Namespace(s.namespace).
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{

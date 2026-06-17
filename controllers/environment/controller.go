@@ -46,6 +46,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// created, so we never issue an update — only create-if-not-found.
 	// The Pod is owned by the Environment so it is garbage-collected when the
 	// Environment is deleted.
+	//
+	// Note: the Environment name is derived from the workspace path (not the
+	// session ID), so one Pod is shared by all sessions operating in the same
+	// directory. See internal/envname for the naming scheme.
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      environment.Name,
@@ -70,11 +74,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 		pod.Spec = corev1.PodSpec{}
 
-		// Mount the session's workspace into the environment when a path has
+		// Mount the workspace directory into the environment when a path has
 		// been provided. The path is a directory on the node (the host
 		// ./workspace bind mount), so we hostPath-mount it at the same path
 		// inside the container, keeping the environment's view consistent with
-		// the caller's working directory. The directory is assumed to exist.
+		// every session's working directory. The directory is assumed to exist.
 		if environment.Spec.Path != "" {
 			hostPathDir := corev1.HostPathDirectory
 

@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"sort"
-	"strings"
 
+	"github.com/skpr/pinchy/internal/envname"
 	"github.com/skpr/pinchy/internal/opencode"
 )
 
@@ -150,9 +149,11 @@ func (b *builder) cardFor(ctx context.Context, session *opencode.Session, status
 	}
 
 	// Build links to the session's environment, served by pinchy-proxy. The
-	// environment is named after the sanitized session ID, matching how the
-	// pinchy API server names the Environment resource.
-	card.EnvName = rfc1123Subdomain(session.ID)
+	// environment is named after the workspace path, matching how the pinchy
+	// API server names the Environment resource. All sessions in the same
+	// directory share a single environment, so EnvName is identical for all
+	// cards in the same swimlane.
+	card.EnvName = envname.FromPath(session.Directory)
 	for _, port := range b.envPorts {
 		card.Envs = append(card.Envs, EnvLink{
 			Port: port,
@@ -191,24 +192,4 @@ func (b *builder) deriveStatus(ctx context.Context, sessionID string, status ope
 	return StatusIdle
 }
 
-// matches any run of characters that are NOT lowercase alphanumeric, '-' or '.'
-var invalidChars = regexp.MustCompile(`[^a-z0-9.-]+`)
 
-// matches leading/trailing characters that aren't alphanumeric
-var trimEdges = regexp.MustCompile(`^[^a-z0-9]+|[^a-z0-9]+$`)
-
-// rfc1123Subdomain converts s into an RFC 1123 subdomain, matching the
-// sanitization the pinchy API server applies when naming Environment resources
-// (servers/api/environment.RFC1123Subdomain). It is duplicated here so the
-// board binary does not depend on the gRPC/Kubernetes-heavy api package.
-func rfc1123Subdomain(s string) string {
-	s = strings.ToLower(s)
-	s = invalidChars.ReplaceAllString(s, "-")
-	s = trimEdges.ReplaceAllString(s, "")
-
-	if len(s) > 253 {
-		s = s[:253]
-		s = trimEdges.ReplaceAllString(s, "")
-	}
-	return s
-}
