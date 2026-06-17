@@ -9,7 +9,7 @@ RUN apk add --no-cache \
 # Consistent UID between container and workstation.
 RUN adduser -D -u 1000 pinchy
 
-# Install the pinchy CLI (pre-built by GoReleaser, copied into build context).
+# Install the pinchy CLI (pre-built by GoReleaser, copied into build context root).
 COPY pinchy /usr/local/bin/pinchy
 
 USER pinchy
@@ -20,16 +20,14 @@ RUN mkdir -p \
     /home/pinchy/.config/opencode/tools \
     /home/pinchy/.config/opencode/agents
 
-# GoReleaser flattens extra_files into the build context root.
-ADD --chown=pinchy:pinchy opencode.json /home/pinchy/.config/opencode/opencode.json
+# extra_files preserves repo-relative paths in the GoReleaser build context.
+ADD --chown=pinchy:pinchy images/opencode/opencode.json /home/pinchy/.config/opencode/opencode.json
 
 # Override the built-in bash tool so commands run in the remote Kubernetes environment.
-# GoReleaser flattens images/opencode/tools/bash.ts → bash.ts in the build context.
-COPY --chown=pinchy:pinchy bash.ts /home/pinchy/.config/opencode/tools/bash.ts
+COPY --chown=pinchy:pinchy images/opencode/tools/bash.ts /home/pinchy/.config/opencode/tools/bash.ts
 
 # Custom agents loaded by opencode from ~/.config/opencode/agents/.
-# GoReleaser flattens images/opencode/agents/*.md → *.md in the build context.
-COPY --chown=pinchy:pinchy architect.md review.md /home/pinchy/.config/opencode/agents/
+COPY --chown=pinchy:pinchy images/opencode/agents/ /home/pinchy/.config/opencode/agents/
 
 # Pre-create the XDG data/state dirs owned by pinchy so that when a named volume
 # is mounted at ~/.local/share/opencode, Docker doesn't create the parent
