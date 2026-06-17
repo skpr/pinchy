@@ -2,15 +2,15 @@ FROM golang:1.26-alpine AS build
 
 WORKDIR /app
 
-# Module + vendored deps first for layer caching.
+# Download deps first for layer caching.
 COPY go.mod go.sum ./
-COPY vendor/ vendor/
+RUN go mod download
 
 # Source.
 COPY . .
 
-# Static binary (matches mise.toml: CGO_ENABLED=0, static link, vendored).
-RUN CGO_ENABLED=0 go build -mod=vendor \
+# Static binary.
+RUN CGO_ENABLED=0 go build \
     -ldflags="-extldflags '-static'" \
     -o /pinchy-proxy \
     github.com/skpr/pinchy/cmd/pinchy-proxy
