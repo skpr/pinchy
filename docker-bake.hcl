@@ -6,9 +6,9 @@ variable "REPO" {
   default = "skpr/pinchy"
 }
 
-// Bare tag suffixes.  CI overrides with e.g. '["latest","sha-abc1234"]'.
+// Comma-separated bare tag suffixes.  CI overrides with e.g. "latest,sha-abc1234".
 variable "TAGS" {
-  default = ["latest"]
+  default = "latest"
 }
 
 variable "PLATFORMS" {
@@ -18,7 +18,7 @@ variable "PLATFORMS" {
 // Returns the full list of image:tag strings for a given component prefix.
 function "image" {
   params = [prefix]
-  result = [for t in TAGS : "${REGISTRY}/${REPO}:${prefix}-${t}"]
+  result = [for t in split(",", TAGS) : "${REGISTRY}/${REPO}:${prefix}-${t}"]
 }
 
 group "default" {

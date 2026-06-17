@@ -50,12 +50,12 @@ jobs:
           ref="${{ github.ref }}"
 
           if [[ "$event" == "push" && "$ref" == refs/heads/* ]]; then
-            tags='["latest","sha-'"$short_sha"'"]'
+            tags="latest,sha-$short_sha"
           elif [[ "$event" == "push" && "$ref" == refs/tags/v* ]]; then
             version="${ref#refs/tags/v}"
-            tags='["v'"$version"'","'"$version"'"]'
+            tags="v$version,$version"
           else
-            tags='["latest"]'
+            tags="latest"
           fi
 
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
