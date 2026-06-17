@@ -1,7 +1,7 @@
 version: 2
 
-# Snapshot builds (local dev) use a fixed "dev" tag so docker-compose can
-# always reference ghcr.io/skpr/pinchy:<component>-dev regardless of git state.
+# Snapshot builds (local dev + main branch CI) use a fixed "dev" tag so
+# docker-compose can always reference ghcr.io/skpr/pinchy:<component>-dev.
 snapshot:
   version_template: "dev"
 
@@ -68,9 +68,8 @@ builds:
 # so the Dockerfiles only need a slim runtime stage.
 #
 # Tag scheme:
-#   git tag vX.Y.Z  → <component>-vX.Y.Z  and  <component>-X.Y.Z
-#   main / snapshot → <component>-latest   and  <component>-sha-<short>
-#   (latest tracks main only; not applied on version tags)
+#   git tag vX.Y.Z  → <component>-vX.Y.Z, <component>-X.Y.Z, <component>-latest
+#   main / snapshot → <component>-dev  (built but never pushed)
 # ---------------------------------------------------------------------------
 
 dockers:
@@ -80,7 +79,7 @@ dockers:
     goarch: amd64
     dockerfile: images/api/Dockerfile
     image_templates:
-      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Version }}-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
 
@@ -89,7 +88,7 @@ dockers:
     goarch: arm64
     dockerfile: images/api/Dockerfile
     image_templates:
-      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Version }}-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
 
@@ -99,7 +98,7 @@ dockers:
     goarch: amd64
     dockerfile: images/operator/Dockerfile
     image_templates:
-      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Version }}-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
 
@@ -108,7 +107,7 @@ dockers:
     goarch: arm64
     dockerfile: images/operator/Dockerfile
     image_templates:
-      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Version }}-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
 
@@ -118,7 +117,7 @@ dockers:
     goarch: amd64
     dockerfile: images/proxy/Dockerfile
     image_templates:
-      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Version }}-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
 
@@ -127,7 +126,7 @@ dockers:
     goarch: arm64
     dockerfile: images/proxy/Dockerfile
     image_templates:
-      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Version }}-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
 
@@ -137,7 +136,7 @@ dockers:
     goarch: amd64
     dockerfile: images/board/Dockerfile
     image_templates:
-      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Version }}-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
 
@@ -146,7 +145,7 @@ dockers:
     goarch: arm64
     dockerfile: images/board/Dockerfile
     image_templates:
-      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Version }}-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
 
@@ -160,7 +159,7 @@ dockers:
       - images/opencode/tools
       - images/opencode/agents
     image_templates:
-      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Version }}-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
 
@@ -173,12 +172,11 @@ dockers:
       - images/opencode/tools
       - images/opencode/agents
     image_templates:
-      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Version }}-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
 
   # ---- litellm ------------------------------------------------------------
-  # No Go binary — GoReleaser builds the image from the upstream base + config.
   - id: litellm-amd64
     ids: []
     goarch: amd64
@@ -186,7 +184,7 @@ dockers:
     extra_files:
       - images/litellm/config.yml
     image_templates:
-      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Version }}-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
 
@@ -197,85 +195,121 @@ dockers:
     extra_files:
       - images/litellm/config.yml
     image_templates:
-      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Version }}-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
 
 # ---------------------------------------------------------------------------
 # Manifests — stitch per-arch images into multi-arch tags.
-# The workflow sets EXTRA_TAG to either "" (skipped) or a second tag
-# (e.g. "sha-abc1234" on main, or "X.Y.Z" on a version tag).
+# On a version tag: <component>-X.Y.Z, <component>-vX.Y.Z, <component>-latest
+# On snapshot:      <component>-dev  (not pushed)
 # ---------------------------------------------------------------------------
 
 docker_manifests:
   # ---- api ----------------------------------------------------------------
-  - name_template: "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}"
+  - name_template: "ghcr.io/skpr/pinchy:api-{{ .Version }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/skpr/pinchy:api-{{ .Env.EXTRA_TAG }}"
-    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+  - name_template: "ghcr.io/skpr/pinchy:api-v{{ .Version }}"
+    skip_push: "{{ .IsSnapshot }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:api-latest"
+    skip_push: "{{ .IsSnapshot }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:api-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Version }}-arm64"
 
   # ---- operator -----------------------------------------------------------
-  - name_template: "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}"
+  - name_template: "ghcr.io/skpr/pinchy:operator-{{ .Version }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/skpr/pinchy:operator-{{ .Env.EXTRA_TAG }}"
-    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+  - name_template: "ghcr.io/skpr/pinchy:operator-v{{ .Version }}"
+    skip_push: "{{ .IsSnapshot }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:operator-latest"
+    skip_push: "{{ .IsSnapshot }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:operator-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Version }}-arm64"
 
   # ---- proxy --------------------------------------------------------------
-  - name_template: "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}"
+  - name_template: "ghcr.io/skpr/pinchy:proxy-{{ .Version }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/skpr/pinchy:proxy-{{ .Env.EXTRA_TAG }}"
-    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+  - name_template: "ghcr.io/skpr/pinchy:proxy-v{{ .Version }}"
+    skip_push: "{{ .IsSnapshot }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:proxy-latest"
+    skip_push: "{{ .IsSnapshot }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Version }}-arm64"
 
   # ---- board --------------------------------------------------------------
-  - name_template: "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}"
+  - name_template: "ghcr.io/skpr/pinchy:board-{{ .Version }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/skpr/pinchy:board-{{ .Env.EXTRA_TAG }}"
-    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+  - name_template: "ghcr.io/skpr/pinchy:board-v{{ .Version }}"
+    skip_push: "{{ .IsSnapshot }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:board-latest"
+    skip_push: "{{ .IsSnapshot }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:board-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Version }}-arm64"
 
   # ---- opencode -----------------------------------------------------------
-  - name_template: "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}"
+  - name_template: "ghcr.io/skpr/pinchy:opencode-{{ .Version }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/skpr/pinchy:opencode-{{ .Env.EXTRA_TAG }}"
-    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+  - name_template: "ghcr.io/skpr/pinchy:opencode-v{{ .Version }}"
+    skip_push: "{{ .IsSnapshot }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:opencode-latest"
+    skip_push: "{{ .IsSnapshot }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Version }}-arm64"
 
   # ---- litellm ------------------------------------------------------------
-  - name_template: "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}"
+  - name_template: "ghcr.io/skpr/pinchy:litellm-{{ .Version }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/skpr/pinchy:litellm-{{ .Env.EXTRA_TAG }}"
-    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+  - name_template: "ghcr.io/skpr/pinchy:litellm-v{{ .Version }}"
+    skip_push: "{{ .IsSnapshot }}"
     image_templates:
-      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-amd64"
-      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-arm64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:litellm-latest"
+    skip_push: "{{ .IsSnapshot }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Version }}-amd64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Version }}-arm64"
