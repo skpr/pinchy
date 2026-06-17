@@ -1,20 +1,20 @@
 services:
   opencode:
-    build:
-      dockerfile: images/opencode/Dockerfile
-      context: .
+    image: ghcr.io/skpr/pinchy:opencode-${PINCHY_TAG:-dev}
     container_name: pinchy-opencode
     network_mode: service:k3s
     restart: unless-stopped
     working_dir: /workspace
+    environment:
+      OPENCODE_EXPERIMENTAL_WORKSPACES: true
+      OPENCODE_EXPERIMENTAL_ICON_DISCOVERY: true
     volumes:
       - ./workspace:/workspace
       # Persist opencode session data (DB, auth, logs) across compose down/up.
       - opencode-data:/home/pinchy/.local/share/opencode
 
   litellm:
-    build:
-      context: images/litellm
+    image: ghcr.io/skpr/pinchy:litellm-${PINCHY_TAG:-dev}
     container_name: pinchy-litellm
     # Share the k3s network namespace so opencode can reach LiteLLM on localhost:4000.
     network_mode: service:k3s
@@ -25,9 +25,7 @@ services:
         condition: service_healthy
 
   api:
-    build:
-      dockerfile: images/api/Dockerfile
-      context: .
+    image: ghcr.io/skpr/pinchy:api-${PINCHY_TAG:-dev}
     container_name: pinchy-api
     network_mode: service:k3s
     restart: unless-stopped
@@ -40,9 +38,7 @@ services:
       - ./.kube:/root/.kube
 
   operator:
-    build:
-      dockerfile: images/operator/Dockerfile
-      context: .
+    image: ghcr.io/skpr/pinchy:operator-${PINCHY_TAG:-dev}
     container_name: pinchy-operator
     network_mode: service:k3s
     restart: unless-stopped
@@ -55,9 +51,7 @@ services:
       - ./.kube:/root/.kube
 
   proxy:
-    build:
-      dockerfile: images/proxy/Dockerfile
-      context: .
+    image: ghcr.io/skpr/pinchy:proxy-${PINCHY_TAG:-dev}
     container_name: pinchy-proxy
     network_mode: service:k3s
     restart: unless-stopped
@@ -70,9 +64,7 @@ services:
       - ./.kube:/root/.kube
 
   board:
-    build:
-      dockerfile: images/board/Dockerfile
-      context: .
+    image: ghcr.io/skpr/pinchy:board-${PINCHY_TAG:-dev}
     container_name: pinchy-board
     network_mode: service:k3s
     restart: unless-stopped

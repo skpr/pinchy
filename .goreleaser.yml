@@ -1,0 +1,281 @@
+version: 2
+
+# Snapshot builds (local dev) use a fixed "dev" tag so docker-compose can
+# always reference ghcr.io/skpr/pinchy:<component>-dev regardless of git state.
+snapshot:
+  version_template: "dev"
+
+# No changelog / GitHub Release — images only.
+release:
+  disable: true
+
+changelog:
+  disable: true
+
+# No binary archives.
+archives:
+  - formats: []
+
+builds:
+  - id: pinchy
+    binary: pinchy
+    main: ./cmd/pinchy
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-extldflags '-static'"]
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+  - id: pinchy-api
+    binary: pinchy-api
+    main: ./cmd/pinchy-api
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-extldflags '-static'"]
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+  - id: pinchy-operator
+    binary: pinchy-operator
+    main: ./cmd/pinchy-operator
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-extldflags '-static'"]
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+  - id: pinchy-proxy
+    binary: pinchy-proxy
+    main: ./cmd/pinchy-proxy
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-extldflags '-static'"]
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+  - id: pinchy-board
+    binary: pinchy-board
+    main: ./cmd/pinchy-board
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-extldflags '-static'"]
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+# ---------------------------------------------------------------------------
+# Docker images — one entry per (component × arch).
+# GoReleaser copies the matching pre-built binary into each build context,
+# so the Dockerfiles only need a slim runtime stage.
+#
+# Tag scheme:
+#   git tag vX.Y.Z  → <component>-vX.Y.Z  and  <component>-X.Y.Z
+#   main / snapshot → <component>-latest   and  <component>-sha-<short>
+#   (latest tracks main only; not applied on version tags)
+# ---------------------------------------------------------------------------
+
+dockers:
+  # ---- api ----------------------------------------------------------------
+  - id: api-amd64
+    ids: [pinchy-api]
+    goarch: amd64
+    dockerfile: images/api/Dockerfile
+    image_templates:
+      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - id: api-arm64
+    ids: [pinchy-api]
+    goarch: arm64
+    dockerfile: images/api/Dockerfile
+    image_templates:
+      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+  # ---- operator -----------------------------------------------------------
+  - id: operator-amd64
+    ids: [pinchy-operator]
+    goarch: amd64
+    dockerfile: images/operator/Dockerfile
+    image_templates:
+      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - id: operator-arm64
+    ids: [pinchy-operator]
+    goarch: arm64
+    dockerfile: images/operator/Dockerfile
+    image_templates:
+      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+  # ---- proxy --------------------------------------------------------------
+  - id: proxy-amd64
+    ids: [pinchy-proxy]
+    goarch: amd64
+    dockerfile: images/proxy/Dockerfile
+    image_templates:
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - id: proxy-arm64
+    ids: [pinchy-proxy]
+    goarch: arm64
+    dockerfile: images/proxy/Dockerfile
+    image_templates:
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+  # ---- board --------------------------------------------------------------
+  - id: board-amd64
+    ids: [pinchy-board]
+    goarch: amd64
+    dockerfile: images/board/Dockerfile
+    image_templates:
+      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - id: board-arm64
+    ids: [pinchy-board]
+    goarch: arm64
+    dockerfile: images/board/Dockerfile
+    image_templates:
+      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+  # ---- opencode -----------------------------------------------------------
+  - id: opencode-amd64
+    ids: [pinchy]
+    goarch: amd64
+    dockerfile: images/opencode/Dockerfile
+    extra_files:
+      - images/opencode/opencode.json
+      - images/opencode/tools
+      - images/opencode/agents
+    image_templates:
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - id: opencode-arm64
+    ids: [pinchy]
+    goarch: arm64
+    dockerfile: images/opencode/Dockerfile
+    extra_files:
+      - images/opencode/opencode.json
+      - images/opencode/tools
+      - images/opencode/agents
+    image_templates:
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+  # ---- litellm ------------------------------------------------------------
+  # No Go binary — GoReleaser builds the image from the upstream base + config.
+  - id: litellm-amd64
+    ids: []
+    goarch: amd64
+    dockerfile: images/litellm/Dockerfile
+    extra_files:
+      - images/litellm/config.yml
+    image_templates:
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+  - id: litellm-arm64
+    ids: []
+    goarch: arm64
+    dockerfile: images/litellm/Dockerfile
+    extra_files:
+      - images/litellm/config.yml
+    image_templates:
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-arm64"
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+# ---------------------------------------------------------------------------
+# Manifests — stitch per-arch images into multi-arch tags.
+# The workflow sets EXTRA_TAG to either "" (skipped) or a second tag
+# (e.g. "sha-abc1234" on main, or "X.Y.Z" on a version tag).
+# ---------------------------------------------------------------------------
+
+docker_manifests:
+  # ---- api ----------------------------------------------------------------
+  - name_template: "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:api-{{ .Env.EXTRA_TAG }}"
+    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:api-{{ .Env.IMAGE_TAG }}-arm64"
+
+  # ---- operator -----------------------------------------------------------
+  - name_template: "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:operator-{{ .Env.EXTRA_TAG }}"
+    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:operator-{{ .Env.IMAGE_TAG }}-arm64"
+
+  # ---- proxy --------------------------------------------------------------
+  - name_template: "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:proxy-{{ .Env.EXTRA_TAG }}"
+    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:proxy-{{ .Env.IMAGE_TAG }}-arm64"
+
+  # ---- board --------------------------------------------------------------
+  - name_template: "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:board-{{ .Env.EXTRA_TAG }}"
+    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:board-{{ .Env.IMAGE_TAG }}-arm64"
+
+  # ---- opencode -----------------------------------------------------------
+  - name_template: "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:opencode-{{ .Env.EXTRA_TAG }}"
+    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:opencode-{{ .Env.IMAGE_TAG }}-arm64"
+
+  # ---- litellm ------------------------------------------------------------
+  - name_template: "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-arm64"
+
+  - name_template: "ghcr.io/skpr/pinchy:litellm-{{ .Env.EXTRA_TAG }}"
+    skip_push: "{{ if .Env.EXTRA_TAG }}false{{ else }}true{{ end }}"
+    image_templates:
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-amd64"
+      - "ghcr.io/skpr/pinchy:litellm-{{ .Env.IMAGE_TAG }}-arm64"

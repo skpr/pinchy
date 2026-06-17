@@ -1,20 +1,3 @@
-FROM golang:1.26-alpine AS build
-
-WORKDIR /app
-
-# Download deps first for layer caching.
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Source.
-COPY . .
-
-# Static binary.
-RUN CGO_ENABLED=0 go build \
-    -ldflags="-extldflags '-static'" \
-    -o /pinchy \
-    github.com/skpr/pinchy/cmd/pinchy
-
 FROM alpine:3.23
 
 RUN apk add --no-cache \
@@ -26,8 +9,8 @@ RUN apk add --no-cache \
 # Consistent UID between container and workstation.
 RUN adduser -D -u 1000 pinchy
 
-# Install the pinchy CLI (used by the bash tool override).
-COPY --from=build /pinchy /usr/local/bin/pinchy
+# Install the pinchy CLI (pre-built by GoReleaser, copied into build context).
+COPY pinchy /usr/local/bin/pinchy
 
 USER pinchy
 
@@ -36,7 +19,8 @@ USER pinchy
 # symlink) by the pinchy user.
 RUN mkdir -p /home/pinchy/.config/opencode
 
-ADD --chown=pinchy:pinchy images/opencode/opencode.json /home/pinchy/.config/opencode/opencode.json
+# GoReleaser copies extra_files flat into the build context.
+ADD --chown=pinchy:pinchy opencode.json /home/pinchy/.config/opencode/opencode.json
 
 # Pre-create the XDG data/state dirs owned by pinchy so that when a named volume
 # is mounted at ~/.local/share/opencode, Docker doesn't create the parent
@@ -54,10 +38,10 @@ ENV PATH="/home/pinchy/.opencode/bin:${PATH}"
 RUN opencode --version
 
 # Override the built-in bash tool so commands run in the remote Kubernetes environment.
-COPY --chown=pinchy:pinchy images/opencode/tools/bash.ts /home/pinchy/.config/opencode/tools/bash.ts
+COPY --chown=pinchy:pinchy tools/bash.ts /home/pinchy/.config/opencode/tools/bash.ts
 
 # Custom agents (reviewer, architect) loaded by opencode from ~/.config/opencode/agents/.
-COPY --chown=pinchy:pinchy images/opencode/agents/ /home/pinchy/.config/opencode/agents/
+COPY --chown=pinchy:pinchy agents/ /home/pinchy/.config/opencode/agents/
 
 # The custom bash tool imports "@opencode-ai/plugin". Bun resolves modules by
 # walking up from the tool file, so make the bundled plugin (installed under

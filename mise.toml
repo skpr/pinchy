@@ -8,7 +8,6 @@ go = "1.26"
 
 [env]
 CGO_ENABLED=0
-LGFLAGS="-extldflags '-static'"
 IMAGE="skpr/pinchy-grpc-go:latest"
 PB_DIR="proto/pb"
 
@@ -25,26 +24,36 @@ description = "Build the grpc protocol"
 file = "scripts/generate.sh"
 depends = ["vendor"]
 
-[tasks."build"]
-description = "Build the application"
-run = '''
-go build -o bin/pinchy -ldflags=${CLI_LDFLAGS} github.com/skpr/pinchy/cmd/pinchy
-go build -o bin/pinchy-api -ldflags=${CLI_LDFLAGS} github.com/skpr/pinchy/cmd/pinchy-api
-go build -o bin/pinchy-operator -ldflags=${CLI_LDFLAGS} github.com/skpr/pinchy/cmd/pinchy-operator
-go build -o bin/pinchy-proxy -ldflags=${CLI_LDFLAGS} github.com/skpr/pinchy/cmd/pinchy-proxy
-'''
-depends = ["vendor"]
-
-[tasks."lint"]
+[tasks.lint]
 description = "Linting automatically checks code for errors and style issues"
 run = "golangci-lint run"
 
 [tasks.test]
 description = "Checks to verify code correctness"
 run = "go test -cover ./..."
-depends = ["vendor"]
+
+[tasks.snapshot]
+description = "Build all images locally via GoReleaser snapshot (tagged :*-dev)"
+env = { IMAGE_TAG = "dev", EXTRA_TAG = "" }
+run = "goreleaser release --snapshot --clean"
+
+[tasks.up]
+description = "Build snapshot images then start the full compose stack"
+depends = ["snapshot"]
+run = "docker compose up -d"
+
+[tasks.start]
+description = "Start the compose stack without rebuilding images"
+run = "docker compose up -d"
+
+[tasks.down]
+description = "Stop and remove the compose stack"
+run = "docker compose down"
+
+[tasks.logs]
+description = "Tail logs from all compose services"
+run = "docker compose logs -f"
 
 [tasks.release]
-description = "Release the command line interface"
-run = "goreleaser"
-depends = ["build"]
+description = "Publish images via GoReleaser (requires IMAGE_TAG and EXTRA_TAG to be set)"
+run = "goreleaser release --clean"

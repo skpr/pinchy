@@ -19,8 +19,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # GoReleaser needs full history to resolve tags.
+          fetch-depth: 0
 
-      # Required for linux/arm64 emulation.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Required for linux/arm64 image assembly (opencode curl-install layer
+      # and litellm upstream base still need per-arch buildx; Go compiles are
+      # native cross-compilation so QEMU is not needed for them).
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -36,12 +47,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Compute the bare tag suffix list that docker-bake.hcl expects.
+      # Set IMAGE_TAG and EXTRA_TAG for GoReleaser's docker_manifests templates.
       #
-      # push to main  → ["latest","sha-<short>"]
-      # push tag v*   → ["vX.Y.Z","X.Y.Z"]          (latest NOT added here)
-      # pull_request  → ["latest"]                   (built but not pushed)
-      - name: Compute tags
+      # push to main  → IMAGE_TAG=latest   EXTRA_TAG=sha-<short>
+      # push tag v*   → IMAGE_TAG=vX.Y.Z   EXTRA_TAG=X.Y.Z
+      # pull_request  → IMAGE_TAG=latest   EXTRA_TAG=  (empty → manifests skipped)
+      - name: Compute image tags
         id: tags
         shell: bash
         run: |
@@ -50,24 +61,24 @@ jobs:
           ref="${{ github.ref }}"
 
           if [[ "$event" == "push" && "$ref" == refs/heads/* ]]; then
-            tags="latest,sha-$short_sha"
+            echo "image_tag=latest"          >> "$GITHUB_OUTPUT"
+            echo "extra_tag=sha-$short_sha"  >> "$GITHUB_OUTPUT"
           elif [[ "$event" == "push" && "$ref" == refs/tags/v* ]]; then
             version="${ref#refs/tags/v}"
-            tags="v$version,$version"
+            echo "image_tag=v$version"       >> "$GITHUB_OUTPUT"
+            echo "extra_tag=$version"        >> "$GITHUB_OUTPUT"
           else
-            tags="latest"
+            echo "image_tag=latest"          >> "$GITHUB_OUTPUT"
+            echo "extra_tag="                >> "$GITHUB_OUTPUT"
           fi
 
-          echo "tags=$tags" >> "$GITHUB_OUTPUT"
-
-      - name: Build (and push) images
-        uses: docker/bake-action@v5
+      - name: Release (build & publish images)
+        uses: goreleaser/goreleaser-action@v6
         with:
-          files: docker-bake.hcl
-          targets: default
-          push: ${{ github.event_name != 'pull_request' }}
-          set: |
-            *.cache-from=type=gha
-            *.cache-to=type=gha,mode=max
+          version: "~> v2"
+          # Snapshot on PRs: builds everything but does not push.
+          args: release --clean ${{ github.event_name == 'pull_request' && '--snapshot' || '' }}
         env:
-          TAGS: ${{ steps.tags.outputs.tags }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: ${{ steps.tags.outputs.image_tag }}
+          EXTRA_TAG: ${{ steps.tags.outputs.extra_tag }}
