@@ -14,13 +14,22 @@ COPY pinchy /usr/local/bin/pinchy
 
 USER pinchy
 
-# Create the config dir as pinchy first; otherwise the ADD below creates the
-# parent directories as root, which blocks later writes (e.g. the plugin
-# symlink) by the pinchy user.
-RUN mkdir -p /home/pinchy/.config/opencode
+# Create the config dirs as pinchy first; otherwise ADD/COPY below creates the
+# parent directories as root, blocking later writes by the pinchy user.
+RUN mkdir -p \
+    /home/pinchy/.config/opencode/tools \
+    /home/pinchy/.config/opencode/agents
 
-# GoReleaser copies extra_files flat into the build context.
+# GoReleaser flattens extra_files into the build context root.
 ADD --chown=pinchy:pinchy opencode.json /home/pinchy/.config/opencode/opencode.json
+
+# Override the built-in bash tool so commands run in the remote Kubernetes environment.
+# GoReleaser flattens images/opencode/tools/bash.ts → bash.ts in the build context.
+COPY --chown=pinchy:pinchy bash.ts /home/pinchy/.config/opencode/tools/bash.ts
+
+# Custom agents loaded by opencode from ~/.config/opencode/agents/.
+# GoReleaser flattens images/opencode/agents/*.md → *.md in the build context.
+COPY --chown=pinchy:pinchy architect.md review.md /home/pinchy/.config/opencode/agents/
 
 # Pre-create the XDG data/state dirs owned by pinchy so that when a named volume
 # is mounted at ~/.local/share/opencode, Docker doesn't create the parent
@@ -36,12 +45,6 @@ ENV PATH="/home/pinchy/.opencode/bin:${PATH}"
 # ~/.opencode/node_modules on first run. Invoke opencode once at build time so
 # that install happens now rather than on container start.
 RUN opencode --version
-
-# Override the built-in bash tool so commands run in the remote Kubernetes environment.
-COPY --chown=pinchy:pinchy tools/bash.ts /home/pinchy/.config/opencode/tools/bash.ts
-
-# Custom agents (reviewer, architect) loaded by opencode from ~/.config/opencode/agents/.
-COPY --chown=pinchy:pinchy agents/ /home/pinchy/.config/opencode/agents/
 
 # The custom bash tool imports "@opencode-ai/plugin". Bun resolves modules by
 # walking up from the tool file, so make the bundled plugin (installed under
