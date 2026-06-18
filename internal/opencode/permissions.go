@@ -19,7 +19,7 @@ type PendingPermission struct {
 }
 
 // PermissionTracker maintains the set of pending permission requests per
-// session by consuming the opencode server's /event SSE stream. The board uses
+// session by consuming the opencode server's /global/event SSE stream. The board uses
 // this to surface "Needs input" sessions and to respond to prompts, since the
 // opencode API has no endpoint to list outstanding permissions directly.
 //
@@ -88,7 +88,7 @@ type sseEvent struct {
 
 // stream opens a single SSE connection and processes events until it ends.
 func (t *PermissionTracker) stream(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.client.baseURL+"/event", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.client.baseURL+"/global/event", nil)
 	if err != nil {
 		return err
 	}
