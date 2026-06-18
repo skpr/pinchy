@@ -168,7 +168,6 @@ dockers:
     goarch: arm64
     dockerfile: images/opencode/Dockerfile
     extra_files:
-      - images/opencode/opencode.json
       - images/opencode/tools
       - images/opencode/agents
     image_templates:
