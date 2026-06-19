@@ -3,6 +3,8 @@ FROM alpine:3.23
 RUN apk add --no-cache \
     bash \
     curl \
+    git \
+    nodejs \
     libstdc++ \
     libgcc
 
@@ -18,13 +20,25 @@ USER pinchy
 # parent directories as root, blocking later writes by the pinchy user.
 RUN mkdir -p \
     /home/pinchy/.config/opencode/tools \
-    /home/pinchy/.config/opencode/agents
+    /home/pinchy/.config/opencode/agents \
+    /home/pinchy/.config/opencode/command
 
 # Override the built-in bash tool so commands run in the remote Kubernetes environment.
 COPY --chown=pinchy:pinchy images/opencode/tools/bash.ts /home/pinchy/.config/opencode/tools/bash.ts
 
 # Custom agents loaded by opencode from ~/.config/opencode/agents/.
 COPY --chown=pinchy:pinchy images/opencode/agents/ /home/pinchy/.config/opencode/agents/
+
+# Clone ponytail at a pinned release so the plugin, hooks, and skills are
+# all present at their expected relative paths.
+RUN git clone --depth 1 --branch v4.7.0 \
+    https://github.com/DietrichGebert/ponytail.git \
+    /home/pinchy/ponytail
+
+# Wire the ponytail plugin into OpenCode's config and expose its slash commands
+# globally (opencode discovers commands from ~/.config/opencode/command/).
+COPY --chown=pinchy:pinchy images/opencode/opencode.json /home/pinchy/.config/opencode/opencode.json
+RUN cp /home/pinchy/ponytail/.opencode/command/*.md /home/pinchy/.config/opencode/command/
 
 # Pre-create the XDG data/state dirs owned by pinchy so that when a named volume
 # is mounted at ~/.local/share/opencode, Docker doesn't create the parent
