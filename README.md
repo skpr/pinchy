@@ -21,6 +21,11 @@ A Docker-based stack for agentic programming — a foundation to build on, a pla
 2. Edit both `.env` files with your credentials
 3. Add SSH key to `config/.ssh/id_rsa` (permissions: `chmod 600`)
 4. Run: `docker compose up -d`
+5. Get t3code pairing key from logs:
+   ```bash
+   docker compose logs pinchy-t3code
+   ```
+   Look for: `pairingUrl: http://localhost:3773/pair#token=XXXXXXXXXX`
 
 ## Usage
 
