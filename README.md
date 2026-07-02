@@ -31,6 +31,8 @@ A Docker-based stack for agentic programming — a foundation to build on, a pla
 
 Access via t3code: http://127.0.0.1:3773
 
+All code belongs in `/workspace` — this directory is shared across all containers.
+
 ## Roadmap
 
 - [ ] Override bash tool — environment per workspace
