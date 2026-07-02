@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["/home/skpr/ponytail/.opencode/plugins/ponytail.mjs"],
+  "provider": {
+    "litellm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LiteLLM",
+      "options": {
+        "baseURL": "http://127.0.0.1:4000/v1"
+      },
+      "models": {
+        "anthropic-opus": { "name": "Anthropic Opus" },
+        "anthropic-sonnet": { "name": "Anthropic Sonnet" },
+        "anthropic-haiku": { "name": "Anthropic Haiku" },
+        "bedrock-opus": { "name": "Bedrock Opus 4.8" },
+        "bedrock-sonnet": { "name": "Bedrock Sonnet 4.6" },
+        "bedrock-haiku": { "name": "Bedrock Haiku 4.5" },
+        "bedrock-glm5": { "name": "Bedrock GLM 5" },
+        "bedrock-qwen-coder-next": { "name": "Bedrock Qwen3 Coder Next" },
+        "bedrock-kimi-2.5": { "name": "Bedrock Kimi K2.5" },
+        "bedrock-minimax-m2.5": { "name": "Bedrock MiniMax M2.5" }
+      }
+    }
+  }
+}

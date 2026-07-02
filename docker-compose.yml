@@ -1,0 +1,64 @@
+services:
+
+  network:
+    container_name: pinchy-network
+    image: alpine:3.24
+    stdin_open: true
+    tty: true
+    ports:
+      - "3773:3773"
+      - "4000:4000"
+      - "4096:4096"
+
+  t3code:
+    container_name: pinchy-t3code
+    build: image/t3code
+    network_mode: service:network
+    restart: unless-stopped
+    working_dir: /workspace
+    env_file: .env.t3code
+    volumes:
+      - ./workspace:/workspace
+      - ./state/t3code:/home/skpr/.t3
+      - ./.ssh/id_rsa:/home/skpr/.ssh/id_rsa:ro
+
+  opencode:
+    container_name: pinchy-opencode
+    build: image/opencode
+    command: ["opencode", "serve", "--hostname", "0.0.0.0", "--port", "4096"]
+    network_mode: service:network
+    restart: unless-stopped
+    working_dir: /workspace
+    environment:
+      DOCKER_HOST: tcp://127.0.0.1:2375
+    volumes:
+      - ./workspace:/workspace
+      - ./state/t3code:/home/skpr/.t3 # Shares worktrees
+      - ./state/opencode:/home/skpr/.local/share/opencode
+    depends_on:
+      - dind
+
+  litellm:
+    container_name: pinchy-litellm
+    image: docker.io/litellm/litellm:v1.89.4
+    command: ["--config", "/app/config.yaml"]
+    network_mode: service:network
+    env_file: .env.opencode
+    volumes:
+      - ./image/litellm/config.yaml:/app/config.yaml:ro
+      - ${HOME}/.aws:/root/.aws:ro
+
+  dind:
+    container_name: pinchy-dind
+    image: docker:27-dind
+    network_mode: service:network
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - ./workspace:/workspace
+      - ./state/t3code:/home/skpr/.t3 # Shares worktrees
+      - dind-storage:/var/lib/docker
+
+volumes:
+  dind-storage:

@@ -1,0 +1,58 @@
+{
+  "defaultThreadEnvMode": "worktree",
+  "addProjectBaseDirectory": "/workspace",
+  "textGenerationModelSelection": {
+    "instanceId": "opencode",
+    "model": "litellm/anthropic-haiku",
+    "options": [
+      {
+        "id": "agent",
+        "value": "build"
+      }
+    ]
+  },
+  "providerInstances": {
+    "grok": {
+      "driver": "grok",
+      "enabled": false,
+      "config": {
+        "enabled": true,
+        "binaryPath": "grok",
+        "customModels": []
+      }
+    },
+    "claudeAgent": {
+      "driver": "claudeAgent",
+      "enabled": false,
+      "config": {
+        "enabled": true,
+        "binaryPath": "claude",
+        "homePath": "",
+        "customModels": [],
+        "launchArgs": ""
+      }
+    },
+    "codex": {
+      "driver": "codex",
+      "enabled": false,
+      "config": {
+        "enabled": true,
+        "binaryPath": "codex",
+        "homePath": "",
+        "shadowHomePath": "",
+        "customModels": []
+      }
+    },
+    "opencode": {
+      "driver": "opencode",
+      "enabled": true,
+      "config": {
+        "enabled": true,
+        "binaryPath": "opencode",
+        "serverUrl": "http://127.0.0.1:4096",
+        "serverPassword": "",
+        "customModels": []
+      }
+    }
+  }
+}

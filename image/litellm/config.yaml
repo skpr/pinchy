@@ -1,0 +1,81 @@
+# LiteLLM proxy configuration.
+#
+# Models are exposed to OpenCode (and anything else on the shared network
+# namespace) via the OpenAI-compatible endpoint at http://127.0.0.1:4000/v1.
+#
+# Auth:
+#   - Anthropic (direct API)  -> ANTHROPIC_API_KEY
+#   - Bedrock                 -> AWS_PROFILE + AWS_REGION (creds via mounted ~/.aws)
+#
+# Bedrock notes:
+#   - Anthropic Claude models on Bedrock require an inference profile, so they
+#     use the `au.` (Sydney: ap-southeast-2 / ap-southeast-4) prefix.
+#   - The remaining Bedrock models (GLM 5, Qwen3 Coder Next, Kimi K2.5,
+#     MiniMax M2.5) are ON_DEMAND and use the bare model id. They are routed
+#     through the Converse API; switch to `bedrock/<id>` (invoke) if a given
+#     model lacks Converse support in this LiteLLM version.
+
+model_list:
+
+  # --- Anthropic (direct API) ---------------------------------------------
+
+  - model_name: anthropic-opus
+    litellm_params:
+      model: anthropic/claude-opus-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: anthropic-haiku
+    litellm_params:
+      model: anthropic/claude-haiku-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # --- Bedrock: Anthropic Claude (inference profiles, au. prefix) ----------
+
+  - model_name: bedrock-opus
+    litellm_params:
+      model: bedrock/au.anthropic.claude-opus-4-8
+      aws_profile_name: os.environ/AWS_PROFILE
+      aws_region_name: os.environ/AWS_REGION
+
+  - model_name: bedrock-sonnet
+    litellm_params:
+      model: bedrock/au.anthropic.claude-sonnet-4-6
+      aws_profile_name: os.environ/AWS_PROFILE
+      aws_region_name: os.environ/AWS_REGION
+
+  - model_name: bedrock-haiku
+    litellm_params:
+      model: bedrock/au.anthropic.claude-haiku-4-5-20251001-v1:0
+      aws_profile_name: os.environ/AWS_PROFILE
+      aws_region_name: os.environ/AWS_REGION
+
+  # --- Bedrock: other providers (ON_DEMAND) --------------------------------
+
+  - model_name: bedrock-glm5
+    litellm_params:
+      model: bedrock/converse/zai.glm-5
+      aws_profile_name: os.environ/AWS_PROFILE
+      aws_region_name: os.environ/AWS_REGION
+
+  - model_name: bedrock-qwen-coder-next
+    litellm_params:
+      model: bedrock/converse/qwen.qwen3-coder-next
+      aws_profile_name: os.environ/AWS_PROFILE
+      aws_region_name: os.environ/AWS_REGION
+
+  - model_name: bedrock-kimi-2.5
+    litellm_params:
+      model: bedrock/converse/moonshotai.kimi-k2.5
+      aws_profile_name: os.environ/AWS_PROFILE
+      aws_region_name: os.environ/AWS_REGION
+
+  - model_name: bedrock-minimax-m2.5
+    litellm_params:
+      model: bedrock/converse/minimax.minimax-m2.5
+      aws_profile_name: os.environ/AWS_PROFILE
+      aws_region_name: os.environ/AWS_REGION
