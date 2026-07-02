@@ -16,11 +16,11 @@ services:
     network_mode: service:network
     restart: unless-stopped
     working_dir: /workspace
-    env_file: .env.t3code
+    env_file: config/.env.t3code
     volumes:
       - ./workspace:/workspace
       - ./state/t3code:/home/skpr/.t3
-      - ./.ssh/id_rsa:/home/skpr/.ssh/id_rsa:ro
+      - ./config/.ssh/id_rsa:/home/skpr/.ssh/id_rsa:ro
 
   opencode:
     container_name: pinchy-opencode
@@ -43,7 +43,7 @@ services:
     image: docker.io/litellm/litellm:v1.89.4
     command: ["--config", "/app/config.yaml"]
     network_mode: service:network
-    env_file: .env.litellm
+    env_file: config/.env.litellm
     volumes:
       - ./image/litellm/config.yaml:/app/config.yaml:ro
       - ${HOME}/.aws:/root/.aws:ro
